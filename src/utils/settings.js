@@ -105,21 +105,21 @@ const defaults = {
   github_user_id: '',
   cloudflare_account_id: '',
   cloudflare_token: '',
-  custom_ct: 'gd-ct-dualstack.ip.zstaticcdn.com',
-  custom_cu: 'gd-cu-dualstack.ip.zstaticcdn.com',
-  custom_cm: 'gd-cm-dualstack.ip.zstaticcdn.com',
+  custom_ct: '14.22.119.35',
+  custom_cu: '122.13.24.8',
+  custom_cm: '211.139.145.129',
   custom_bd: '',
-  node_1: '',
-  node_2: '',
-  node_3: '',
+  node_1: '[240e:93c:209:2:8000:0:b00:59]',
+  node_2: '[2408:8756:dcff:e001:8000:0:b00:99]',
+  node_3: '[2409:8c54:b010:1c:8000:0:b00:63]',
   node_4: '',
-  custom_ct_name: '电信',
-  custom_cu_name: '联通',
-  custom_cm_name: '移动',
+  custom_ct_name: '电信 V4',
+  custom_cu_name: '联通 V4',
+  custom_cm_name: '移动 V4',
   custom_bd_name: 'BGP',
-  node_1_name: 'Node 1',
-  node_2_name: 'Node 2',
-  node_3_name: 'Node 3',
+  node_1_name: '电信 V6',
+  node_2_name: '联通 V6',
+  node_3_name: '移动 V6',
   node_4_name: 'Node 4',
   expire_reminder: '0',
   resource_alert_rules: [],
@@ -672,6 +672,43 @@ export async function loadSiteSettings(db, options = {}) {
     result.notification_timezone = normalizeNotificationTimezone(result.notification_timezone);
     result.expire_notification_time = normalizeExpireNotificationTime(result.expire_notification_time);
     result.traffic_alert_threshold = normalizeTrafficAlertThreshold(result.traffic_alert_threshold);
+
+    if (!result.custom_ct || result.custom_ct === 'gd-ct-dualstack.ip.zstaticcdn.com') {
+      result.custom_ct = defaults.custom_ct;
+    }
+    if (!result.custom_cu || result.custom_cu === 'gd-cu-dualstack.ip.zstaticcdn.com') {
+      result.custom_cu = defaults.custom_cu;
+    }
+    if (!result.custom_cm || result.custom_cm === 'gd-cm-dualstack.ip.zstaticcdn.com') {
+      result.custom_cm = defaults.custom_cm;
+    }
+    if (!result.node_1) {
+      result.node_1 = defaults.node_1;
+    }
+    if (!result.node_2) {
+      result.node_2 = defaults.node_2;
+    }
+    if (!result.node_3) {
+      result.node_3 = defaults.node_3;
+    }
+    if (!result.custom_ct_name || result.custom_ct_name === '电信') {
+      result.custom_ct_name = defaults.custom_ct_name;
+    }
+    if (!result.custom_cu_name || result.custom_cu_name === '联通') {
+      result.custom_cu_name = defaults.custom_cu_name;
+    }
+    if (!result.custom_cm_name || result.custom_cm_name === '移动') {
+      result.custom_cm_name = defaults.custom_cm_name;
+    }
+    if (!result.node_1_name || result.node_1_name === 'Node 1') {
+      result.node_1_name = defaults.node_1_name;
+    }
+    if (!result.node_2_name || result.node_2_name === 'Node 2') {
+      result.node_2_name = defaults.node_2_name;
+    }
+    if (!result.node_3_name || result.node_3_name === 'Node 3') {
+      result.node_3_name = defaults.node_3_name;
+    }
   } catch (e) {
     console.error('加载站点设置失败:', e);
   }

@@ -18,9 +18,14 @@ export const DEFAULT_SERVER_CARD_CONFIG = {
 }
 
 const THREE_NET_DEFS = [
-  { key: 'ct', pingField: 'ping_ct', lossField: 'loss_ct', labelKey: 'pingCt', fallbackLabel: 'CT' },
-  { key: 'cu', pingField: 'ping_cu', lossField: 'loss_cu', labelKey: 'pingCu', fallbackLabel: 'CU' },
-  { key: 'cm', pingField: 'ping_cm', lossField: 'loss_cm', labelKey: 'pingCm', fallbackLabel: 'CM' }
+  { key: 'ct', pingField: 'ping_ct', lossField: 'loss_ct', nameKey: 'custom_ct_name', labelKey: 'pingCt', fallbackLabel: '电信 V4' },
+  { key: 'cu', pingField: 'ping_cu', lossField: 'loss_cu', nameKey: 'custom_cu_name', labelKey: 'pingCu', fallbackLabel: '联通 V4' },
+  { key: 'cm', pingField: 'ping_cm', lossField: 'loss_cm', nameKey: 'custom_cm_name', labelKey: 'pingCm', fallbackLabel: '移动 V4' },
+  { key: 'node_1', pingField: 'ping_node_1', lossField: 'loss_node_1', nameKey: 'node_1_name', labelKey: 'node_1', fallbackLabel: '电信 V6' },
+  { key: 'node_2', pingField: 'ping_node_2', lossField: 'loss_node_2', nameKey: 'node_2_name', labelKey: 'node_2', fallbackLabel: '联通 V6' },
+  { key: 'node_3', pingField: 'ping_node_3', lossField: 'loss_node_3', nameKey: 'node_3_name', labelKey: 'node_3', fallbackLabel: '移动 V6' },
+  { key: 'bd', pingField: 'ping_bd', lossField: 'loss_bd', nameKey: 'custom_bd_name', labelKey: 'pingBd', fallbackLabel: 'BGP' },
+  { key: 'node_4', pingField: 'ping_node_4', lossField: 'loss_node_4', nameKey: 'node_4_name', labelKey: 'node_4', fallbackLabel: 'Node 4' }
 ]
 
 const DEFAULT_THREE_NET_POINT_COUNT = LATENCY_WINDOW.POINTS
@@ -369,10 +374,23 @@ export function useServerCardData(props) {
     return Math.max(pingCount, lossCount, getLatencyWindowConfigPointCount())
   }
 
+  const resolveNodeLabel = (def) => {
+    let name = props.server?.[def.nameKey] || props.sysConfig?.[def.nameKey]
+    if (!name || name === 'Node 1' || name === 'Node 2' || name === 'Node 3') {
+      name = def.fallbackLabel
+    } else if (name === '电信' && def.key === 'ct') {
+      name = '电信 V4'
+    } else if (name === '联通' && def.key === 'cu') {
+      name = '联通 V4'
+    } else if (name === '移动' && def.key === 'cm') {
+      name = '移动 V4'
+    }
+    return String(name || (def.labelKey && trans.value[def.labelKey]) || def.fallbackLabel)
+  }
+
   const threeNetDetails = computed(() => THREE_NET_DEFS
     .map(def => {
-      const customName = props.sysConfig?.[`custom_${def.key}_name`]
-      const label = String(customName || trans.value[def.labelKey] || def.fallbackLabel)
+      const label = resolveNodeLabel(def)
       const pingSeries = getLatencySeries('ping', def.key)
       const lossSeries = getLatencySeries('loss', def.key)
       const pointCount = Math.max(pingSeries.length, lossSeries.length, getLatencyWindowPointCount())
@@ -405,29 +423,35 @@ export function useServerCardData(props) {
         (typeof point.loss === 'number' && Number.isFinite(point.loss))
       ))
 
+      const rawPing = props.server[def.pingField]
+      const isExplicitlyDisabled = rawPing === false || rawPing === 'false'
+      const isUnconfigured = rawPing === undefined || rawPing === null || rawPing === ''
+
+      // If the node is explicitly disabled or unconfigured AND has no measured history, skip it
+      const isNodeActive = !(isExplicitlyDisabled && !hasMeasuredPoint) && !(isUnconfigured && !hasMeasuredPoint)
+
       return {
         ...def,
         label,
         latestPing: getLatestSeriesValue(pingSeries, props.server[def.pingField]),
         averageLoss: getAverageSeriesValue(lossSeries, props.server[def.lossField]),
         title: hasMeasuredPoint ? '' : `${label} ${trans.value.offline}`,
-        points
+        points,
+        isNodeActive
       }
     })
+    .filter(row => row.isNodeActive)
   )
 
   const hasThreeNetDetails = computed(() => threeNetDetails.value.length > 0)
 
-  const pingList = computed(() => [
-    { label: 'CT', value: props.server.ping_ct },
-    { label: 'CU', value: props.server.ping_cu },
-    { label: 'CM', value: props.server.ping_cm },
-    { label: 'BGP', value: props.server.ping_bd },
-    { label: props.server.node_1_name || 'Node 1', value: props.server.ping_node_1 },
-    { label: props.server.node_2_name || 'Node 2', value: props.server.ping_node_2 },
-    { label: props.server.node_3_name || 'Node 3', value: props.server.ping_node_3 },
-    { label: props.server.node_4_name || 'Node 4', value: props.server.ping_node_4 }
-  ].filter(ping => !isPingDisabled(ping.value)))
+  const pingList = computed(() => THREE_NET_DEFS
+    .map(def => ({
+      label: resolveNodeLabel(def),
+      value: props.server[def.pingField]
+    }))
+    .filter(ping => !isPingDisabled(ping.value) && ping.value !== undefined && ping.value !== null && ping.value !== '')
+  )
 
   const hasPingData = computed(() => pingList.value.length > 0)
 
