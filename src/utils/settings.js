@@ -7,9 +7,7 @@ import { normalizePct } from './traffic.js';
 
 export const APPEARANCE_FIELDS = ['site_title', 'custom_bg', 'custom_bg_mobile', 'favicon', 'custom_head', 'custom_script', 'csp_static', 'csp_api', 'display_mode', 'preferred_theme', 'default_language', 'theme_options'];
 
-const GITHUB_OAUTH_FIELDS = ['github_oauth_enabled', 'github_client_id', 'github_client_secret', 'github_user_id'];
-export const SITE_FIELDS = ['is_public', 'show_price', 'show_expire', 'show_tf', 'show_three_net_details', 'wss_report_enabled', 'wss_report_hours', 'frontend_ws_timeout_minutes', 'long_history_points', 'tg_notify', 'tg_bot_token', 'tg_chat_id', 'notification_timezone', 'expire_notification_time', 'notification_webhook_enabled', 'notification_webhook_url', 'notification_webhook_method', 'notification_webhook_format', 'notification_webhook_headers', 'notification_webhook_body', 'notification_template', 'turnstile_enabled', 'turnstile_login_enabled', 'turnstile_site_key', 'turnstile_secret_key', 'jwt_secret', 'username', 'password', ...GITHUB_OAUTH_FIELDS, 'cloudflare_account_id', 'cloudflare_token', 'custom_ct', 'custom_cu', 'custom_cm', 'custom_bd', 'node_1', 'node_2', 'node_3', 'node_4', 'custom_ct_name', 'custom_cu_name', 'custom_cm_name', 'custom_bd_name', 'node_1_name', 'node_2_name', 'node_3_name', 'node_4_name', 'expire_reminder', 'resource_alert_rules', 'traffic_alert_threshold', 'theme_url', 'servers_optimized'];
-const LEGACY_SITE_FIELDS = SITE_FIELDS.filter(field => !GITHUB_OAUTH_FIELDS.includes(field));
+export const SITE_FIELDS = ['is_public', 'show_price', 'show_expire', 'show_tf', 'show_three_net_details', 'wss_report_enabled', 'wss_report_hours', 'frontend_ws_timeout_minutes', 'long_history_points', 'tg_notify', 'tg_bot_token', 'tg_chat_id', 'notification_timezone', 'expire_notification_time', 'notification_webhook_enabled', 'notification_webhook_url', 'notification_webhook_method', 'notification_webhook_format', 'notification_webhook_headers', 'notification_webhook_body', 'notification_template', 'turnstile_enabled', 'turnstile_login_enabled', 'turnstile_site_key', 'turnstile_secret_key', 'jwt_secret', 'username', 'password', 'cloudflare_account_id', 'cloudflare_token', 'custom_ct', 'custom_cu', 'custom_cm', 'custom_bd', 'node_1', 'node_2', 'node_3', 'node_4', 'custom_ct_name', 'custom_cu_name', 'custom_cm_name', 'custom_bd_name', 'node_1_name', 'node_2_name', 'node_3_name', 'node_4_name', 'expire_reminder', 'resource_alert_rules', 'traffic_alert_threshold', 'theme_url', 'servers_optimized'];
 
 export const TG_NOTIFY_MINUTES_MIN = 2;
 export const TG_NOTIFY_MINUTES_MAX = 30;
@@ -72,7 +70,9 @@ const defaults = {
   display_mode: 'ring',
   preferred_theme: 'auto',
   default_language: 'auto',
-  theme_options: {},
+  theme_options: {
+    homepageMultiPingTaskIds: [1, 2, 3, 5, 6, 7]
+  },
   is_public: 'true',
   show_price: 'true',
   show_expire: 'true',
@@ -99,10 +99,6 @@ const defaults = {
   turnstile_site_key: '',
   turnstile_secret_key: '',
   jwt_secret: '',
-  github_oauth_enabled: 'false',
-  github_client_id: '',
-  github_client_secret: '',
-  github_user_id: '',
   cloudflare_account_id: '',
   cloudflare_token: '',
   custom_ct: '14.22.119.35',
@@ -647,8 +643,8 @@ export async function loadSiteSettings(db, options = {}) {
       }
     }
 
-    if (hasMissingFields(siteOptions, LEGACY_SITE_FIELDS)) {
-      copyFields(result, await loadLegacySettings(db, LEGACY_SITE_FIELDS), LEGACY_SITE_FIELDS);
+    if (hasMissingFields(siteOptions, SITE_FIELDS)) {
+      copyFields(result, await loadLegacySettings(db, SITE_FIELDS), SITE_FIELDS);
     }
     copyFields(result, siteOptions, SITE_FIELDS);
 
@@ -755,6 +751,38 @@ export async function loadAppearanceOptions(db) {
     result.display_mode = normalizeDisplayMode(result.display_mode, defaults.display_mode);
     result.preferred_theme = normalizePreferredTheme(result.preferred_theme);
     result.default_language = normalizeDefaultLanguage(result.default_language);
+
+    if (!result.theme_options || typeof result.theme_options !== 'object' || Array.isArray(result.theme_options)) {
+      result.theme_options = {};
+    }
+    const currentTaskIds = Array.isArray(result.theme_options.homepageMultiPingTaskIds)
+      ? result.theme_options.homepageMultiPingTaskIds
+      : [];
+    const hasV6 = currentTaskIds.includes(5) || currentTaskIds.includes(6) || currentTaskIds.includes(7);
+    if (!hasV6) {
+      result.theme_options = {
+        ...result.theme_options,
+        homepageMultiPingTaskIds: Array.from(new Set([...(currentTaskIds.length ? currentTaskIds : [1, 2, 3]), 5, 6, 7]))
+      };
+      if (db) {
+        db.prepare(
+          `INSERT INTO settings (key, value)
+           VALUES ('appearance_options', json_object('theme_options', json(?)))
+           ON CONFLICT(key) DO UPDATE SET value = CASE
+             WHEN json_valid(value) THEN CASE
+               WHEN json_type(value) = 'object' THEN json_set(value, '$.theme_options', json(?))
+               ELSE json_object('theme_options', json(?))
+             END
+             ELSE json_object('theme_options', json(?))
+           END`
+        ).bind(
+          JSON.stringify(result.theme_options),
+          JSON.stringify(result.theme_options),
+          JSON.stringify(result.theme_options),
+          JSON.stringify(result.theme_options)
+        ).run().catch(e => console.error('自动保存默认 theme_options 失败:', e));
+      }
+    }
   } catch (e) {
     console.error('加载外观设置失败:', e);
   }
@@ -811,8 +839,8 @@ export async function saveSiteOptions(db, updates) {
   const existingSiteOptions = siteRow && siteRow.value
     ? tryParseJSON(siteRow.value) || {}
     : {};
-  const legacySiteOptions = hasMissingFields(existingSiteOptions, LEGACY_SITE_FIELDS)
-    ? await loadLegacySettings(db, LEGACY_SITE_FIELDS)
+  const legacySiteOptions = hasMissingFields(existingSiteOptions, SITE_FIELDS)
+    ? await loadLegacySettings(db, SITE_FIELDS)
     : {};
   
   const merged = { ...legacySiteOptions, ...existingSiteOptions, ...updates };
