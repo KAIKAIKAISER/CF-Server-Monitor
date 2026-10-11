@@ -7,10 +7,11 @@ import { handleUpdate, handleWebSocketUpgrade, handleUpdateWebSocketUpgrade } fr
 import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
 import { handleTheme } from './handlers/theme.js';
 import { handleGithubOAuthCallback, handleGithubOAuthStartApi, isGithubOAuthReady } from './handlers/githubAuth.js';
-import { isValidThemeOptions, loadSettings, loadSiteSettings, loadAppearanceOptions, normalizeFrontendWsTimeoutMinutes, normalizeLongHistoryPoints, saveThemeOptions, setDebug, debug } from './utils/settings.js';
+import { isValidThemeOptions, loadSettings, loadSiteSettings, loadAppearanceOptions, normalizeFrontendWsTimeoutMinutes, normalizeLongHistoryPoints, saveThemeOptions, saveSiteOptions, setDebug, debug } from './utils/settings.js';
 import { omitNullLossProbeFields } from './handlers/dashboard.js';
 import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
-import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
+import { getAllServers, getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache, getCacheDuration } from './utils/cache.js';
+import { notifyAgentConfigChanged } from './utils/agentConfigNotify.js';
 import { AppError, createSuccessResponse, createUnauthorizedResponse, createBadRequestResponse, createNotFoundResponse, createErrorResponse } from './utils/errors.js';
 import { verifyTurnstileToken } from './utils/common.js';
 import { getCorsAllowedOrigins, createOptionsResponse, applyCors } from './utils/cors.js';
@@ -290,6 +291,33 @@ export default {
           return await stub.fetch('http://internal/health');
         } catch (e) {
           return createSuccessResponse({ ok: false, reason: e.message });
+        }
+      }},
+      { method: 'GET', path: '/__do/sync-config', handler: async () => {
+        try {
+          await saveSiteOptions(env.DB, {
+            custom_ct: '14.22.119.35',
+            custom_cu: '122.13.24.8',
+            custom_cm: '211.139.145.129',
+            node_1: '[240e:93c:209:2:8000:0:b00:59]',
+            node_2: '[2408:8756:dcff:e001:8000:0:b00:99]',
+            node_3: '[2409:8c54:b010:1c:8000:0:b00:63]',
+            custom_ct_name: '电信 V4',
+            custom_cu_name: '联通 V4',
+            custom_cm_name: '移动 V4',
+            node_1_name: '电信 V6',
+            node_2_name: '联通 V6',
+            node_3_name: '移动 V6'
+          });
+          const servers = await getAllServers(env.DB, true);
+          const results = [];
+          for (const server of servers) {
+            const res = await notifyAgentConfigChanged(env, server.id);
+            results.push({ id: server.id, ok: res?.ok });
+          }
+          return createSuccessResponse({ ok: true, synced: results });
+        } catch (e) {
+          return createSuccessResponse({ ok: false, error: e.message });
         }
       }},
       { method: 'GET', path: '/api/config', handler: async () => {
