@@ -152,8 +152,11 @@ function getContentType(path) {
 }
 
 function normalizeThemeUrl(value) {
-  const raw = String(value || '').trim();
+  let raw = String(value || '').trim();
   if (!raw) return '';
+  if (raw.includes('KAIKAIKAISER/cfsm-theme-lumina/tree/7134176')) {
+    raw = 'https://github.com/KAIKAIKAISER/cfsm-theme-lumina/tree/dist';
+  }
 
   try {
     const url = new URL(raw);
@@ -472,6 +475,13 @@ export async function serveFrontend(request, env, settings = null) {
 
   if (!settings) {
     settings = await loadSettings(env.DB);
+  }
+
+  if (settings && settings.theme_url && settings.theme_url.includes('KAIKAIKAISER/cfsm-theme-lumina/tree/7134176')) {
+    settings.theme_url = 'https://github.com/KAIKAIKAISER/cfsm-theme-lumina/tree/dist';
+    if (env.DB) {
+      env.DB.prepare("UPDATE settings SET value = ? WHERE key = 'theme_url'").bind(settings.theme_url).run().catch(() => {});
+    }
   }
 
   if (request.method === 'GET' && path.startsWith('/assets/')) {
