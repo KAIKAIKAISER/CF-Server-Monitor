@@ -419,11 +419,15 @@ async function loadThemeIndex(themeUrl) {
   const parsedTheme = parseThemeUrl(themeUrl);
   if (!parsedTheme) return null;
 
+  const isCommit = isCommitRef(parsedTheme.ref);
+  const ttl = isCommit ? THEME_COMMIT_CACHE_TTL_SECONDS : 60;
+  const cacheKey = `${parsedTheme.cacheBase}/index.html?v=3`;
+
   const response = await fetchWithCache(
     `${parsedTheme.rawBase}/index.html`,
     'text/html;charset=UTF-8',
-    `${parsedTheme.cacheBase}/index.html`,
-    getThemeWorkerCacheTtl(parsedTheme)
+    cacheKey,
+    ttl
   );
 
   if (!response.ok) return null;
