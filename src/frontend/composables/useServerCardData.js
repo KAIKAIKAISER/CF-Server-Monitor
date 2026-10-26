@@ -17,6 +17,7 @@ export const DEFAULT_SERVER_CARD_CONFIG = {
   display_mode: 'bar'
 }
 
+// 首页三网面板的候选节点，按展示优先级排列；loss 末条为 false（后台设为 0）时跳过。
 const THREE_NET_DEFS = [
   { key: 'ct', pingField: 'ping_ct', lossField: 'loss_ct', nameKey: 'custom_ct_name', labelKey: 'pingCt', fallbackLabel: '电信 V4' },
   { key: 'cu', pingField: 'ping_cu', lossField: 'loss_cu', nameKey: 'custom_cu_name', labelKey: 'pingCu', fallbackLabel: '联通 V4' },
@@ -229,7 +230,7 @@ export function useServerCardData(props) {
     const hours = Math.floor((totalSeconds % 86400) / 3600)
     const minutes = Math.floor((totalSeconds % 3600) / 60)
     const seconds = totalSeconds % 60
-    const zh = currentLang.value === 'zh'
+    const zh = currentLang.value.startsWith('zh')
     const parts = []
 
     if (days > 0) parts.push(zh ? `${days}天` : `${days}d`)
@@ -442,7 +443,6 @@ export function useServerCardData(props) {
     })
     .filter(row => row.isNodeActive)
   )
-
   const hasThreeNetDetails = computed(() => threeNetDetails.value.length > 0)
 
   const pingList = computed(() => THREE_NET_DEFS
